@@ -1,0 +1,558 @@
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* body 不再用 flex */
+body {
+    background: #eef2f5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    color: #1f2d3d;
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+/* 主容器居中 + 上边距 */
+.media-manager {
+    max-width: 1400px;
+    width: 100%;
+    margin: 50px auto 2rem auto;
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+/* 头部 - 浅灰偏冷 */
+.manager-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+.manager-header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1e2a3a;
+    letter-spacing: -0.01em;
+}
+
+/* 双栏布局 */
+.manager-layout {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+/* 左侧文件夹区 - 浅色偏深边框 */
+.folder-sidebar {
+    width: 280px;
+    background: #f9fbfd;
+    border-right: 1px solid #e2edf2;
+    padding: 1.25rem;
+    flex-shrink: 0;
+}
+
+.folder-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+}
+.folder-header h2 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #4a5b6e;
+}
+.folder-actions-toolbar {
+    display: flex;
+    gap: 0.5rem;
+}
+.icon-btn {
+    background: none;
+    border: none;
+    color: #5b6e8c;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+    padding: 0.25rem;
+    border-radius: 0.375rem;
+}
+.icon-btn:hover {
+    color: #1e2a3a;
+    background: #e9edf2;
+}
+
+/* 文件夹树 - 深色文字 */
+.folder-tree {
+    font-size: 0.875rem;
+}
+.folder-tree ul {
+    list-style: none;
+    padding-left: 1.25rem;
+}
+.folder-tree li {
+    margin: 0.25rem 0;
+}
+.folder-name {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.375rem 0.5rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background 0.15s;
+    color: #2c3e4e;
+}
+.root-folder > .folder-name {
+    font-weight: 500;
+}
+.root-folder .folder-label i {
+    color: #4b5563;   /* 与普通文件夹图标颜色略有区分 */
+}
+.folder-name:hover {
+    background: #eef2f8;
+}
+.folder-tree .active > .folder-name {
+    background: #e2e8f0;
+    color: #0f172a;
+    font-weight: 500;
+}
+.folder-label i {
+    margin-right: 0.5rem;
+    color: #7c8b9c;
+    width: 1.25rem;
+}
+.folder-actions {
+    display: none;
+    gap: 0.25rem;
+}
+.folder-name:hover .folder-actions {
+    display: flex;
+}
+.folder-actions i {
+    font-size: 0.7rem;
+    padding: 0.2rem;
+    border-radius: 0.25rem;
+    transition: background 0.2s;
+    color: #6c7e97;
+}
+.folder-actions i:hover {
+    background: #d0dbe8;
+    color: #1e293b;
+}
+
+/* 右侧文件区 - 纯白底，深色点缀 */
+.file-content {
+    flex: 1;
+    background: #ffffff;
+    padding: 1.25rem;
+    min-width: 0;
+}
+
+.file-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+.file-toolbar h2 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #4a5b6e;
+    text-transform: uppercase;
+}
+.toolbar-buttons {
+    display: flex;
+    gap: 0.75rem;
+}
+.btn-gray {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    padding: 0.4rem 0.9rem;
+    border-radius: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #1e2a3a;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.btn-gray i {
+    font-size: 0.8rem;
+    color: #5b6e8c;
+}
+.btn-gray:hover {
+    background: #e6edf4;
+    border-color: #a0aec0;
+}
+.btn-danger {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #b91c1c;
+}
+.btn-danger:hover {
+    background: #fee2e2;
+    border-color: #fca5a5;
+}
+
+/* 文件列表网格 - 横排卡片，深色边框 */
+.file-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+/* 文件卡片 - 浅色底，深灰文字，阴影轻微 */
+.file-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 0.75rem 0.5rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    position: relative;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+.file-card:hover {
+    background: #f9fbfd;
+    border-color: #cbd5e1;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px -8px rgba(0,0,0,0.08);
+}
+.file-card.selected {
+    background: #eef2ff;
+    border-color: #a5b4fc;
+}
+.file-checkbox {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    width: 1rem;
+    height: 1rem;
+    accent-color: #4b5563;
+    z-index: 2;
+    cursor: pointer;
+}
+.file-icon {
+    text-align: center;
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    color: #5b6e8c;
+}
+.file-name {
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 0.25rem;
+    color: #1f2a3e;
+}
+.file-size {
+    font-size: 0.65rem;
+    text-align: center;
+    color: #7c8ba0;
+    margin-top: 0.25rem;
+}
+.empty-files {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 3rem;
+    color: #8ca0b3;
+    background: #fafcff;
+    border-radius: 0.75rem;
+    font-size: 0.9rem;
+    border: 1px dashed #cbd5e1;
+}
+
+/* 模态框 - 浅色质感 */
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(2px);
+}
+.modal.active {
+    display: flex;
+}
+.modal-content {
+    background: #ffffff;
+    border-radius: 1rem;
+    width: 90%;
+    max-width: 420px;
+    padding: 1.5rem;
+    box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.2);
+    border: 1px solid #e2edf2;
+}
+.modal-content h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #1e2a3a;
+}
+.modal-content input, 
+.modal-content select {
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #cfdee9;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 1.25rem;
+    color: #1e2a3a;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border 0.2s;
+}
+.modal-content input:focus,
+.modal-content select:focus {
+    border-color: #9aaebf;
+    box-shadow: 0 0 0 2px #e2e8f0;
+}
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+.modal-buttons button {
+    padding: 0.4rem 1rem;
+    border-radius: 0.5rem;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+.btn-secondary {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #2c3e4e;
+}
+.btn-secondary:hover {
+    background: #e2e8f0;
+}
+.btn-primary {
+    background: #eef2f8;
+    border: 1px solid #cbd5e1;
+    color: #1f2a3e;
+}
+.btn-primary:hover {
+    background: #e2e8f0;
+    border-color: #a0aec0;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    body { padding: 1rem; }
+    .manager-layout { flex-direction: column; }
+    .folder-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #e2edf2; }
+    .file-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}
+
+
+/* ====== 后台风格顶部导航（修复二级菜单、布局） ====== */
+.admin-top-nav {
+    background: #1e2a3a;
+    color: #f8fafc;
+    padding: 0 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.nav-container {
+    display: flex;
+    align-items: center;
+    height: 48px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.nav-brand {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #ffffff;
+    text-decoration: none;
+    margin-right: 2rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.nav-menu {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    align-items: center;
+    /* 让菜单占满剩余空间，也可以删掉此行让菜单自然居左 */
+    /* margin-left: auto; */
+}
+
+.nav-menu > li {
+    position: relative;          /* 必须，让子菜单相对定位 */
+    height: 100%;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.nav-menu > li > a {
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    color: #cbd5e1;
+    text-decoration: none;
+    font-size: 0.85rem;
+    height: 100%;
+    transition: color 0.15s, background 0.15s;
+    white-space: nowrap;
+}
+
+.nav-menu > li > a:hover,
+.nav-menu > li.current > a {
+    color: #ffffff;
+    background: rgba(255,255,255,0.15);
+    font-weight: 500;
+}
+
+/* 二级菜单容器 <menu> */
+.nav-menu > li > menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: #1e2a3a;
+    border-radius: 0 0 0.5rem 0.5rem;
+    min-width: 160px;
+    padding: 0.5rem 0;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    z-index: 200;
+    list-style: none;
+    margin: 0;
+}
+
+/* hover 显示子菜单 */
+.nav-menu > li:hover > menu {
+    display: block;
+}
+
+/* 子菜单项 */
+.nav-menu > li > menu li {
+    display: block;
+}
+
+.nav-menu > li > menu li a {
+    display: block;
+    padding: 0.4rem 1.5rem;
+    color: #cbd5e1;
+    text-decoration: none;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.nav-menu > li > menu li a:hover,
+.nav-menu > li > menu li.current a {
+    background: rgba(255,255,255,0.15);
+    color: #ffffff;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    .admin-top-nav {
+        padding: 0 0.75rem;
+    }
+    .nav-menu {
+        overflow-x: auto;
+    }
+}
+
+/* 将右侧区域推到最右 */
+.nav-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+}
+
+.nav-right .nav-item,
+.nav-right .nav-user {
+    color: #cbd5e1;
+    text-decoration: none;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    transition: color 0.15s;
+}
+
+.nav-right .nav-item:hover {
+    color: #ffffff;
+}
+
+.nav-right .nav-user {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.nav-right .nav-user i {
+    font-size: 0.9rem;
+}
+
+/* 复制 URL 按钮 */
+.copy-url-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 0.375rem;
+    background: rgba(255,255,255,0.85);
+    border: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s, background 0.2s;
+    z-index: 5;
+    color: #4a5b6e;
+    font-size: 0.75rem;
+}
+.file-card:hover .copy-url-btn {
+    opacity: 1;
+}
+.copy-url-btn:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #1e2a3a;
+}
+.copy-url-btn i {
+    pointer-events: none;  /* 防止点击事件落在 icon 上 */
+}
+.site-footer {
+    text-align: center;
+    padding: 1.5rem 0;
+    margin-top: 2rem;
+    font-size: 0.85rem;
+    color: #8898aa;
+    border-top: 1px solid #e2e8f0;
+}
+.site-footer a {
+    color: #4a5b6e;
+    text-decoration: none;
+}
+.site-footer a:hover {
+    text-decoration: underline;
+}
