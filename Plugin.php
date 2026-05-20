@@ -15,7 +15,12 @@ class MediaPU_Plugin implements Typecho_Plugin_Interface
     public static function activate()
     {
         self::createTables();
-        self::repairAttachments();  // 格式迁移 + MIME 修复
+        // 创建缩略图缓存目录
+        $thumbDir = __TYPECHO_ROOT_DIR__ . '/usr/thumbnails';
+        if (!is_dir($thumbDir)) {
+            @mkdir($thumbDir, 0755, true);
+        }
+        self::repairAttachments();
         Helper::addPanel(3, 'MediaPU/panel.php', '媒体库', '管理所有媒体文件', 'administrator');
         Helper::addRoute('media_api', '/action/media', 'MediaPU_Widget_Action', 'execute');
         Typecho_Plugin::factory('admin/header.php')->header = array('MediaPU_Plugin', 'addFontAwesome');
@@ -86,7 +91,6 @@ class MediaPU_Plugin implements Typecho_Plugin_Interface
             $attach = self::parseAttachmentText($row['text']);
             if (empty($attach)) continue;
 
-            // 补全 MIME
             if (empty($attach['mime'])) {
                 $path = $attach['path'] ?? '';
                 $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
@@ -102,7 +106,6 @@ class MediaPU_Plugin implements Typecho_Plugin_Interface
                 $attach['mime'] = $mimeMap[$ext] ?? 'application/octet-stream';
             }
 
-            // 统一转为 JSON 存储
             $json = json_encode($attach, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             if ($json === false) continue;
 
@@ -120,8 +123,12 @@ class MediaPU_Plugin implements Typecho_Plugin_Interface
      */
     public static function addFontAwesome($header)
     {
-        $header .= '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">';
         $options = Typecho_Widget::widget('Widget_Options');
+        $pluginOptions = Helper::options()->plugin('MediaPU');
+        $thumbWidth = intval($pluginOptions->thumb_width ?: 150);
+        $thumbHeight = intval($pluginOptions->thumb_height ?: 150);
+        
+        $header .= '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">';
         $mediaApiUrl = Typecho_Common::url('/action/media', $options->siteUrl);
         $header .= <<<EOT
 <style>
@@ -141,11 +148,16 @@ class MediaPU_Plugin implements Typecho_Plugin_Interface
 .media-file-item{border:1px solid #ddd;border-radius:6px;padding:10px;text-align:center;cursor:pointer;background:#fff}
 .media-file-item:hover{background:#f0f4ff}
 .media-file-item .file-icon{font-size:2rem;color:#666;margin-bottom:5px}
+.media-file-item .file-thumb img{max-width:100%; height:auto; max-height:100px; object-fit:cover; border-radius:4px;}
 .media-file-item .file-name{font-size:0.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .media-file-item .file-size{font-size:0.7rem;color:#999}
 .media-file-item .insert-btn{display:block;margin-top:8px;padding:3px 8px;background:#467b96;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem}
 </style>
 <script>
+var thumbWidth = {$thumbWidth};
+var thumbHeight = {$thumbHeight};
+var mediaApiUrl = '{$mediaApiUrl}';
+
 (function() {
     function init() {
         if (typeof jQuery === 'undefined') return;
@@ -176,7 +188,6 @@ class MediaPU_Plugin implements Typecho_Plugin_Interface
         ];
         $('body').append(modalParts.join(''));
 
-        var mediaApiUrl = '$mediaApiUrl';
         var currentMediaFolder = 0;
 
         $('#media-library-btn').click(function() {
@@ -231,13 +242,19 @@ class MediaPU_Plugin implements Typecho_Plugin_Interface
                 return;
             }
             files.forEach(function(file) {
+                var isImage = /\\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(file.url);
+                var thumbUrl = mediaApiUrl + '?action=thumb&cid=' + file.cid + '&w=' + thumbWidth + '&h=' + thumbHeight;
                 var icon = getFileIcon(file.url);
-                var card = '<div class="media-file-item">' +
-                    '<div class="file-icon"><i class="' + icon + '"></i></div>' +
-                    '<div class="file-name" title="' + escapeHtml(file.title) + '">' + escapeHtml(file.title) + '</div>' +
-                    '<div class="file-size">' + formatSize(file.size) + '</div>' +
-                    '<button class="insert-btn" data-url="' + escapeHtml(file.url) + '" data-title="' + escapeHtml(file.title) + '">插入</button>' +
-                    '</div>';
+                var card = '<div class="media-file-item">';
+                if (isImage) {
+                    card += '<div class="file-thumb"><img src="' + thumbUrl + '" style="max-width:100%; height:auto;"></div>';
+                } else {
+                    card += '<div class="file-icon"><i class="' + icon + '"></i></div>';
+                }
+                card += '<div class="file-name" title="' + escapeHtml(file.title) + '">' + escapeHtml(file.title) + '</div>' +
+                        '<div class="file-size">' + formatSize(file.size) + '</div>' +
+                        '<button class="insert-btn" data-url="' + escapeHtml(file.url) + '" data-title="' + escapeHtml(file.title) + '">插入</button>' +
+                        '</div>';
                 list.append(card);
             });
         }
@@ -309,6 +326,24 @@ EOT;
         $description->input->setAttribute('disabled', 'disabled');
         $form->addInput($description);
 
+        $thumbWidth = new Typecho_Widget_Helper_Form_Element_Text(
+            'thumb_width',
+            null,
+            '150',
+            _t('缩略图宽度(px)'),
+            _t('媒体库中图片显示的缩略图宽度，默认150px')
+        );
+        $form->addInput($thumbWidth);
+        
+        $thumbHeight = new Typecho_Widget_Helper_Form_Element_Text(
+            'thumb_height',
+            null,
+            '150',
+            _t('缩略图高度(px)'),
+            _t('媒体库中图片显示的缩略图高度，默认150px，留空则自动按比例')
+        );
+        $form->addInput($thumbHeight);
+        
         echo '<div class="typecho-option" style="margin-top:20px;">
             <label class="typecho-label">修复附件数据</label>
             <p class="description">如果文件管理页面出现 0kb、无链接 等问题，可点击下方按钮修复。</p>

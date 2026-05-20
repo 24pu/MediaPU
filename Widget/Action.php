@@ -42,6 +42,9 @@ class MediaPU_Widget_Action extends Widget_Abstract
                 MediaPU_Plugin::repairAttachments();
                 $this->json(['code' => 200, 'msg' => '修复完成']);
                 break;
+            case 'thumb':
+                $this->thumb();
+                break;
             default:
                 $this->json(['code' => 400, 'msg' => '无效请求']);
         }
@@ -55,21 +58,16 @@ class MediaPU_Widget_Action extends Widget_Abstract
         exit;
     }
 
-    /**
-     * 兼容 PHP 序列化和 JSON 的附件数据解析
-     */
     private function parseAttachmentText($text)
     {
         $attach = @unserialize($text);
         if ($attach !== false && is_array($attach)) {
             return $attach;
         }
-        
         $attach = @json_decode($text, true);
         if (is_array($attach)) {
             return $attach;
         }
-        
         return [];
     }
 
@@ -206,16 +204,15 @@ class MediaPU_Widget_Action extends Widget_Abstract
     private function deleteFiles()
     {
         $cids = $this->request->getArray('cids');
-        
         if (!is_array($cids) || empty($cids)) {
             $this->json(['code' => 400, 'msg' => '请选择文件']);
         }
-
         $db = Typecho_Db::get();
         $prefix = $db->getPrefix();
         $contentsTable = $prefix . 'contents';
         $relTable = $prefix . 'media_relations';
-
+        $thumbDir = __TYPECHO_ROOT_DIR__ . '/usr/thumbnails';
+        
         foreach ($cids as $cid) {
             $row = $db->fetchRow($db->select('text')->from($contentsTable)->where('cid = ?', $cid));
             if ($row) {
@@ -225,6 +222,13 @@ class MediaPU_Widget_Action extends Widget_Abstract
                     if (file_exists($filePath)) {
                         @unlink($filePath);
                     }
+                }
+            }
+            // 删除缩略图缓存
+            if (is_dir($thumbDir)) {
+                $pattern = $thumbDir . '/' . $cid . '_*';
+                foreach (glob($pattern) as $cache) {
+                    @unlink($cache);
                 }
             }
             $db->query($db->delete($contentsTable)->where('cid = ?', $cid));
@@ -423,5 +427,147 @@ class MediaPU_Widget_Action extends Widget_Abstract
         } else {
             $this->json(['code' => 500, 'msg' => '文件保存失败']);
         }
+    }
+
+    /**
+     * 生成缩略图并输出
+     */
+    private function thumb()
+    {
+        $cid = intval($this->request->get('cid', 0));
+        $url = $this->request->get('url', '');
+        $w = intval($this->request->get('w', 0));
+        $h = intval($this->request->get('h', 0));
+        
+        if ($w <= 0 && $h <= 0) {
+            $w = 150; $h = 150;
+        }
+        
+        // 获取原图本地路径
+        $filePath = null;
+        if ($cid > 0) {
+            $db = Typecho_Db::get();
+            $row = $db->fetchRow($db->select('text')->from('table.contents')->where('cid = ?', $cid));
+            if ($row) {
+                $attach = $this->parseAttachmentText($row['text']);
+                if (!empty($attach['path'])) {
+                    $filePath = __TYPECHO_ROOT_DIR__ . '/' . ltrim($attach['path'], '/');
+                }
+            }
+        } elseif (!empty($url)) {
+            $baseDir = rtrim(__TYPECHO_ROOT_DIR__, '/');
+            $cleanUrl = ltrim(parse_url($url, PHP_URL_PATH), '/');
+            $fullPath = $baseDir . '/' . $cleanUrl;
+            if (strpos($fullPath, $baseDir) === 0 && file_exists($fullPath)) {
+                $filePath = $fullPath;
+            }
+        }
+        
+        if (!$filePath || !file_exists($filePath)) {
+            $this->json(['code' => 404, 'msg' => '文件不存在']);
+        }
+        
+        // 检查是否为图片
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'])) {
+            $this->json(['code' => 400, 'msg' => '非图片文件']);
+        }
+        
+        // 缓存目录和文件名
+        $thumbDir = __TYPECHO_ROOT_DIR__ . '/usr/thumbnails';
+        $cacheKey = $cid . '_' . $w . 'x' . $h . '.' . $ext;
+        $cacheFile = $thumbDir . '/' . $cacheKey;
+        
+        // 如果缓存存在且原图修改时间未更新（可选：检查原图mtime），直接输出
+        if (file_exists($cacheFile)) {
+            $mime = mime_content_type($cacheFile);
+            header('Content-Type: ' . $mime);
+            readfile($cacheFile);
+            exit;
+        }
+        
+        // 生成缩略图
+        $imageInfo = @getimagesize($filePath);
+        if (!$imageInfo) {
+            $this->json(['code' => 500, 'msg' => '无效图片']);
+        }
+        list($srcW, $srcH, $type) = $imageInfo;
+        
+        // 计算缩略图尺寸（保持比例）
+        if ($w > 0 && $h > 0) {
+            $ratio = min($w / $srcW, $h / $srcH);
+            $thumbW = round($srcW * $ratio);
+            $thumbH = round($srcH * $ratio);
+        } elseif ($w > 0) {
+            $ratio = $w / $srcW;
+            $thumbW = $w;
+            $thumbH = round($srcH * $ratio);
+        } elseif ($h > 0) {
+            $ratio = $h / $srcH;
+            $thumbH = $h;
+            $thumbW = round($srcW * $ratio);
+        } else {
+            $thumbW = $srcW;
+            $thumbH = $srcH;
+        }
+        
+        $thumb = imagecreatetruecolor($thumbW, $thumbH);
+        switch ($type) {
+            case IMAGETYPE_JPEG:
+                $src = @imagecreatefromjpeg($filePath);
+                break;
+            case IMAGETYPE_PNG:
+                $src = @imagecreatefrompng($filePath);
+                imagealphablending($thumb, false);
+                imagesavealpha($thumb, true);
+                break;
+            case IMAGETYPE_GIF:
+                $src = @imagecreatefromgif($filePath);
+                break;
+            case IMAGETYPE_WEBP:
+                $src = @imagecreatefromwebp($filePath);
+                break;
+            case IMAGETYPE_BMP:
+                $src = @imagecreatefrombmp($filePath);
+                break;
+            default:
+                $this->json(['code' => 500, 'msg' => '不支持的图片类型']);
+        }
+        if (!$src) {
+            $this->json(['code' => 500, 'msg' => '图片读取失败']);
+        }
+        
+        imagecopyresampled($thumb, $src, 0, 0, 0, 0, $thumbW, $thumbH, $srcW, $srcH);
+        
+        // 确保缓存目录存在
+        if (!is_dir($thumbDir)) {
+            @mkdir($thumbDir, 0755, true);
+        }
+        
+        // 保存缓存文件
+        switch ($type) {
+            case IMAGETYPE_JPEG:
+                imagejpeg($thumb, $cacheFile, 85);
+                break;
+            case IMAGETYPE_PNG:
+                imagepng($thumb, $cacheFile);
+                break;
+            case IMAGETYPE_GIF:
+                imagegif($thumb, $cacheFile);
+                break;
+            case IMAGETYPE_WEBP:
+                imagewebp($thumb, $cacheFile);
+                break;
+            default:
+                imagejpeg($thumb, $cacheFile, 85);
+        }
+        imagedestroy($src);
+        imagedestroy($thumb);
+        
+        // 输出缓存文件
+        $mime = mime_content_type($cacheFile);
+        header('Content-Type: ' . $mime);
+        readfile($cacheFile);
+        exit;
     }
 }
